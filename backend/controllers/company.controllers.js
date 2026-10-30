@@ -1,197 +1,110 @@
-import { Company } from "../src/models/company.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { Company } from "../src/models/company.model.js";
+import { failure, handleError, success } from "../src/utils/http.js";
 
+function publicCompany(company) {
+    return {
+        _id: company._id,
+        companyName: company.companyName,
+        email: company.email,
+        phoneNumber: company.phoneNumber,
+        location: company.location || "",
+        website: company.website || "",
+        industry: company.industry || "",
+        size: company.size || "",
+        logo: company.logo || "",
+        description: company.description || "",
+    };
+}
 
-export const registerCompany = async (req, res) => {
+export async function registerCompany(req, res) {
     try {
         const { companyName, email, phoneNumber, password } = req.body;
-
         if (!companyName || !email || !phoneNumber || !password) {
-            return res.status(400).json({ 
-                message: "All fields are required",
-                success: false
-            });
+            return failure(res, 400, "All fields are required");
         }
-
-        const company = await Company.findOne({ name: companyName });
-        if (company) {
-            return res.status(400).json({
-                message: "Company already exists",
-                success: false
-            });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
+        if (await Company.exists({ email })) return failure(res, 400, "Company already exists");
 
         await Company.create({
             companyName,
             email,
             phoneNumber,
-            password: hashedPassword,
+            password: await bcrypt.hash(password, 10),
         });
-
-        return res.status(201).json({
-            message: "Company registered successfully",
-            success: true
-        });
-
+        return success(res, 201, "Company registered successfully");
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
-    }   
+        return handleError(res, error);
+    }
+}
 
-};
-
-export const loginCompany = async (req, res) => {
+export async function loginCompany(req, res) {
     try {
-        const { email, password } = req.body;   
-
-        if (!email || !password) {
-            return res.status(400).json({
-                message: "Email and password are required",
-                success: false
-            });
-        }
+        const { email, password } = req.body;
+        if (!email || !password) return failure(res, 400, "Email and password are required");
 
         const company = await Company.findOne({ email });
-        if (!company) {
-            return res.status(400).json({
-                message: "Company not found",
-                success: false
-            });
-        }
-
-        const isPasswordValid = await bcrypt.compare(password, company.password);
-        if (!isPasswordValid) {
-            return res.status(400).json({
-                message: "Invalid password",
-                success: false
-            });
+        if (!company || !(await bcrypt.compare(password, company.password))) {
+            return failure(res, 400, "Invalid email or password");
         }
 
         const token = jwt.sign({ companyId: company._id }, process.env.SECRET_KEY, { expiresIn: "1h" });
-
-        res.cookie("token", token, {
+        return res.cookie("token", token, {
+            maxAge: 60 * 60 * 1000,
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict",
-            maxAge: 3600000, // 1 hour
-        });
-
-        return res.status(200).json({
+        }).json({
             message: "Company logged in successfully",
+            company: publicCompany(company),
             success: true,
-            company: {
-                _id: company._id,
-                companyName: company.companyName,
-                email: company.email,
-                phoneNumber: company.phoneNumber,
-            },
         });
-
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-};
+export function logoutCompany(req, res) {
+    res.clearCookie("token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+    });
+    return success(res, 200, "Company logged out successfully");
+}
 
-
-export const logoutCompany = async (req, res) => {
+export async function getCompanyById(req, res) {
     try {
-        res.clearCookie("token", {  
-
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-        });
-
-        return res.status(200).json({
-            message: "Company logged out successfully",
-            success: true
-        });
-
+        const company = await Company.findById(req.companyId || req.params.id);
+        if (!company) return failure(res, 404, "Company not found");
+        return success(res, 200, "Company fetched successfully", { company });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-
-};
-
-
-// get company by id
-export const getCompanyById = async (req, res) => {
+export async function updateCompanyProfile(req, res) {
     try {
-        const companyId = req.companyId || req.params.id;
-
-        const company = await Company.findById(companyId);
-        if (!company) {
-            return res.status(404).json({
-                message: "Company not found",
-                success: false
-            });
-        }
-
-        return res.status(200).json({
-            message: "Company fetched successfully",
-            success: true,
-            company,
-        });
-
+        const company = await Company.findByIdAndUpdate(
+            req.companyId || req.params.id,
+            req.body,
+            { new: true, runValidators: true },
+        );
+        if (!company) return failure(res, 404, "Company not found");
+        return success(res, 200, "Company profile updated successfully", { company: publicCompany(company) });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-};
-
-
-export const updateCompanyProfile = async (req, res) => {
+export async function getAllCompanies(req, res) {
     try {
-        const companyId = req.params.id;
-        const { companyName, email, phoneNumber } = req.body;
-
-        const company = await Company.findById(companyId);
-        if (!company) {
-            return res.status(404).json({
-                message: "Company not found",
-                success: false
-            });
-        }
-
-        company.companyName = companyName || company.companyName;
-        company.email = email || company.email;
-        company.phoneNumber = phoneNumber || company.phoneNumber;
-
-        await company.save();
-
-        return res.status(200).json({
-            message: "Company profile updated successfully",
-            success: true,
-            company,
+        const companies = await Company.find().select("-password").sort({ createdAt: -1 });
+        return success(res, 200, "Companies fetched successfully", {
+            companies: companies.map(publicCompany),
         });
-
-
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-};

@@ -8,6 +8,9 @@ export type Company = {
   location?: string;
   industry?: string;
   logo?: string;
+  website?: string;
+  size?: string;
+  description?: string;
 };
 
 export type Application = {
@@ -29,6 +32,9 @@ export type Job = {
   position: string;
   experience: string;
   skills: string[];
+  category?: string;
+  deadline?: string;
+  featured?: boolean;
   company: Company | string;
   createdAt?: string;
 };
@@ -44,9 +50,3 @@ export type User = {
     skills?: string[];
   };
 };
-
-export type ApiResponse<T> = {
-  success?: boolean;
-  message?: string;
-  [key: string]: unknown;
-} & T;

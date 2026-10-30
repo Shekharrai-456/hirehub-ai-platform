@@ -1,205 +1,107 @@
 import bcrypt from "bcryptjs";
-import { User } from "../src/models/user.model.js";
 import jwt from "jsonwebtoken";
+import { User } from "../src/models/user.model.js";
+import { failure, handleError, success } from "../src/utils/http.js";
 
-export const registerUser = async (req, res) => {
+function publicUser(user) {
+    return {
+        _id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        profile: user.profile,
+    };
+}
+
+export async function registerUser(req, res) {
     try {
         const { fullName, name, email, phoneNumber, password, role } = req.body;
-        const userFullName = fullName || name;
-        if (!userFullName || !email || !phoneNumber || !password || !role) {
-            return res.status(400).json({ 
-            message: "All fields are required",
-            success: false
-            });
-        };
-
-        const user = await User.findOne({ email });
-        if (user) {
-            return res.status(400).json({ 
-                message: "User already exists",
-                success: false
-            });
+        const userName = fullName || name;
+        if (!userName || !email || !phoneNumber || !password || !role) {
+            return failure(res, 400, "All fields are required");
         }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
+        if (await User.exists({ email })) return failure(res, 400, "User already exists");
 
         await User.create({
-            fullName: userFullName,
-            email,  
+            fullName: userName,
+            email,
             phoneNumber,
-            password: hashedPassword,
+            password: await bcrypt.hash(password, 10),
             role,
         });
-
-        return res.status(201).json({
-            message: "User registered successfully",
-            success: true
-        });
-
-
+        return success(res, 201, "User registered successfully");
     } catch (error) {
-        console.log(error);
-        res.status(500).json({ 
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
-};
+}
 
-
-
-export const loginUser = async (req, res) => {
+export async function loginUser(req, res) {
     try {
         const { email, password, role } = req.body;
-
         if (!email || !password || !role) {
-            return res.status(400).json({ 
-                message: "Email, password, and role are required",
-                success: false
-            });
+            return failure(res, 400, "Email, password, and role are required");
         }
 
-        let user = await User.findOne({ email});
-        if (!user) {
-            return res.status(400).json({ 
-                message: "Invalid email or password",
-                success: false
-            });
+        const user = await User.findOne({ email });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return failure(res, 400, "Invalid email or password");
         }
+        if (role !== user.role) return failure(res, 400, "Account does not exist for this role");
 
-        const isPasswordMatched = await bcrypt.compare(password, user.password);
-        if (!isPasswordMatched) {
-            return res.status(400).json({ 
-                message: "Invalid email or password",
-                success: false
-            });
-        }
-
-        //check role is correct or not
-        if (role !== user.role) {
-            return res.status(400).json({ 
-                message: "Account does not exist for this role",
-                success: false
-            });
-        }
-
-        const tokenData = {
-            userId: user._id,
-        }
-        const token = await jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: "1d" });
-
-        user = {
-            _id: user._id,
-            fullName: user.fullName,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            role: user.role,
-            profile : user.profile,
-        }
-
-        return res.status(200).cookie("token", token, {maxAge: 24 * 60 * 60 * 1000, httpOnly: true, sameSite: 'strict'}).json({
+        const token = jwt.sign({ userId: user._id }, process.env.SECRET_KEY, { expiresIn: "1d" });
+        return res.cookie("token", token, {
+            maxAge: 24 * 60 * 60 * 1000,
+            httpOnly: true,
+            sameSite: "strict",
+        }).json({
             message: `Welcome back, ${user.fullName}`,
-            user,
+            user: publicUser(user),
             success: true,
-            token,
         });
-
-
-
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
-    }           
-}
-
-
-
-export const logoutUser = async (req, res) => {
-    try {
-        res.clearCookie("token", { httpOnly: true, sameSite: 'strict' });       
-
-        return res.status(200).json({
-            message: "Logged out successfully",
-            success: true
-        });
+        return handleError(res, error);
     }
-    catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
-    }   
-
 }
 
+export function logoutUser(req, res) {
+    res.clearCookie("token", { httpOnly: true, sameSite: "strict" });
+    return success(res, 200, "Logged out successfully");
+}
 
-
-export const updateProfile = async (req, res) => {
+export async function getProfile(req, res) {
     try {
-        const { fullName, name, email, phoneNumber, bio, skills = "" } = req.body;
-        const userFullName = fullName || name;
-        const file = req.file; // Assuming you're using multer for file uploads
-        if (!userFullName || !email || !phoneNumber) {
-            return res.status(400).json({ 
-                message: "Full name, email, and phone number are required",
-                success: false
-            });
+        const user = await User.findById(req.id).select("-password");
+        if (!user) return failure(res, 404, "User not found");
+        return success(res, 200, "Profile retrieved successfully", { user: publicUser(user) });
+    } catch (error) {
+        return handleError(res, error);
+    }
+}
+
+export async function updateProfile(req, res) {
+    try {
+        const { fullName, name, email, phoneNumber, bio = "", skills = "" } = req.body;
+        const userName = fullName || name;
+        if (!userName || !email || !phoneNumber) {
+            return failure(res, 400, "Full name, email, and phone number are required");
         }
 
-        // cloudinary image upload
+        const user = await User.findById(req.id);
+        if (!user) return failure(res, 404, "User not found");
 
-
-
-
-        const skillsArray = skills
-            .split(",")
-            .map((skill) => skill.trim())
-            .filter(Boolean);
-        const userId = req.id; // middleware authentication 
-        let user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ 
-                message: "User not found",
-                success: false
-            });
-        }
-
-        // Update user profile
-        user.fullName = userFullName;
+        user.fullName = userName;
         user.email = email;
         user.phoneNumber = phoneNumber;
         user.profile = user.profile || {};
-        user.profile.bio = bio || "";
-        user.profile.skills = skillsArray;
-
-        // resume 
-
+        user.profile.bio = bio;
+        user.profile.skills = Array.isArray(skills)
+            ? skills
+            : skills.split(",").map((skill) => skill.trim()).filter(Boolean);
         await user.save();
 
-        user = {
-            _id: user._id,
-            fullName: user.fullName,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            role: user.role,
-            profile : user.profile,
-        }
-
-        return res.status(200).json({
-            message: "Profile updated successfully",
-            user,
-            success: true
-        });
-
+        return success(res, 200, "Profile updated successfully", { user: publicUser(user) });
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
 }

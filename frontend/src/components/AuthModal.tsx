@@ -1,7 +1,9 @@
+
 "use client";
 
 import type { ChangeEvent, FormEvent, MouseEvent } from "react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/src/components/Icon";
 import { loginUser, registerUser } from "@/src/lib/api";
 import type { Role, User } from "@/src/types";
@@ -28,6 +30,7 @@ const emptyForm: FormValues = {
 };
 
 export function AuthModal({ onClose, onLogin }: AuthModalProps) {
+  const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("login");
   const [role, setRole] = useState<Role>("user");
   const [form, setForm] = useState<FormValues>(emptyForm);
@@ -52,6 +55,32 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
     setIsSubmitting(true);
 
     try {
+      if (role === "recruiter") {
+        if (isRegistering) {
+          const { registerCompany } = await import("@/src/lib/api");
+          await registerCompany({
+            companyName: form.fullName,
+            email: form.email,
+            phoneNumber: form.phoneNumber,
+            password: form.password,
+          });
+          setMode("login");
+          setForm((currentForm) => ({
+            ...emptyForm,
+            email: currentForm.email,
+          }));
+          return;
+        } else {
+          const { loginCompany } = await import("@/src/lib/api");
+          const response = await loginCompany(form.email, form.password);
+          window.localStorage.setItem("hirehub-company", JSON.stringify(response.company));
+          onClose();
+          router.push("/recruiter");
+          router.refresh();
+          return;
+        }
+      }
+
       if (isRegistering) {
         await registerUser({ ...form, role });
         setMode("login");

@@ -48,6 +48,20 @@ const jobSchema = new mongoose.Schema({
         type: [String],
     },
 
+    category: {
+        type: String,
+        default: "Information Technology",
+    },
+
+    deadline: {
+        type: String,
+    },
+
+    featured: {
+        type: Boolean,
+        default: false,
+    },
+
 
     company: {
         type: mongoose.Schema.Types.ObjectId,

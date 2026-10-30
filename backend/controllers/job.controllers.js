@@ -1,215 +1,133 @@
 import { Job } from "../src/models/job.model.js";
+import { failure, handleError, success } from "../src/utils/http.js";
 
-export const postJob = async (req, res) => {
+import mongoose from "mongoose";
+
+const companyFields = "companyName email phoneNumber location industry logo website";
+
+function toList(value) {
+    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+export async function postJob(req, res) {
     try {
-        const { title, description, requirements, location, jobType, experience, position, salary, skills, company } = req.body;
+        const {
+            title, description, requirements, location, jobType,
+            experience, position, salary, skills, company,
+            category, deadline, featured,
+        } = req.body;
         const companyId = req.companyId || company;
 
-        if (!title || !description || !location || !salary || !companyId || !requirements || !jobType || !experience || !position || !skills) {
-            return res.status(400).json({
-                message: "All fields are required",
-                success: false
-            });
-        }   
+        if (!title || !description || !requirements || !location || !jobType ||
+            !experience || !position || !salary || !skills || !companyId) {
+            return failure(res, 400, "All fields are required");
+        }
 
         const job = await Job.create({
             title,
             description,
-            requirements,
+            requirements: toList(requirements),
             location,
             jobType,
             experience,
             position,
-            salary,
-            skills: Array.isArray(skills) ? skills : skills.split(",").map((skill) => skill.trim()).filter(Boolean),
+            salary: Number(salary) || 0,
+            skills: toList(skills),
             company: companyId,
-            ...(req.id ? { createdBy: req.id } : {}),
+            category: category || "Information Technology",
+            deadline: deadline || "30 days remaining",
+            featured: Boolean(featured),
+            ...(req.id && { createdBy: req.id }),
         });
 
-        return res.status(201).json({
-            message: "Job posted successfully",
-            success: true,
-            job
-        });
-
+        return success(res, 201, "Job posted successfully", { job });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-    
-    
-};
-
-export const getAllJobs = async (req, res) => {
+export async function getAllJobs(req, res) {
     try {
-        const jobs = await Job.find().populate("company", "companyName email phoneNumber");
-        if (!jobs || jobs.length === 0) {
-            return res.status(404).json({
-                message: "No jobs found",
-                success: false
-            });
+        const { keyword, location, jobType } = req.query;
+        const query = {};
+
+        if (keyword) {
+            query.$or = [
+                { title: { $regex: keyword, $options: "i" } },
+                { description: { $regex: keyword, $options: "i" } },
+                { skills: { $in: [new RegExp(keyword, "i")] } },
+            ];
         }
-        return res.status(200).json({
-            message: "Jobs retrieved successfully",
-            success: true,
-            jobs
-        });
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
-    }
-
-};
-
-export const getJobById = async (req, res) => {
-    try {
-        const jobId = req.params.id;
-
-        const job = await Job.findById(jobId).populate("company", "companyName email phoneNumber");
-        if (!job) {
-            return res.status(404).json({
-                message: "Job not found",
-                success: false
-            });
+        if (location) {
+            query.location = { $regex: location, $options: "i" };
+        }
+        if (jobType && jobType !== "all") {
+            query.jobType = jobType;
         }
 
-        return res.status(200).json({
-            message: "Job retrieved successfully",
-            success: true,
-            job
-        });
+        const jobs = await Job.find(query)
+            .populate("company", companyFields)
+            .sort({ createdAt: -1 });
 
+        return success(res, 200, "Jobs retrieved successfully", { jobs: jobs || [] });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-};
-
-export const getAdminJobs = async (req, res) => {
+export async function getJobById(req, res) {
     try {
-        const jobs = await Job.find().populate("company", "companyName email phoneNumber");
-        if (!jobs || jobs.length === 0) {
-            return res.status(404).json({
-                message: "No jobs found",
-                success: false
-            });
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return failure(res, 404, "Job not found");
         }
-        return res.status(200).json({
-            message: "Jobs retrieved successfully",
-            success: true,
-            jobs
-        });
+        const job = await Job.findById(req.params.id).populate("company", companyFields);
+        if (!job) return failure(res, 404, "Job not found");
+        return success(res, 200, "Job retrieved successfully", { job });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
-};
+}
 
-export const getJobsByCompanyId = async (req, res) => {
+export async function getAdminJobs(req, res) {
+    return getAllJobs(req, res);
+}
+
+export async function getJobsByCompanyId(req, res) {
     try {
-        const companyId = req.params.companyId;
-        const jobs = await Job.find({ company: companyId }).populate("company", "companyName email phoneNumber");
-
-        if (!jobs || jobs.length === 0) {
-            return res.status(404).json({
-                message: "No jobs found for this company",
-                success: false
-            });
+        if (!mongoose.Types.ObjectId.isValid(req.params.companyId)) {
+            return success(res, 200, "Jobs retrieved successfully", { jobs: [] });
         }
+        const jobs = await Job.find({ company: req.params.companyId })
+            .populate("company", companyFields)
+            .sort({ createdAt: -1 });
 
-        return res.status(200).json({
-            message: "Jobs retrieved successfully",
-            success: true,
-            jobs
-        });
+        return success(res, 200, "Jobs retrieved successfully", { jobs: jobs || [] });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
-};
+}
 
-
-export const updateJob = async (req, res) => {
+export async function updateJob(req, res) {
     try {
-        const jobId = req.params.id;
-        const { title, description, requirements, location, jobType, experience, position, salary } = req.body;
-
-        const job = await Job.findById(jobId);
-        if (!job) {
-            return res.status(404).json({
-                message: "Job not found",
-                success: false
-            });
-
-        }
-        job.title = title || job.title;
-        job.description = description || job.description;
-        job.requirements = requirements || job.requirements;
-
-        job.location = location || job.location;
-        job.jobType = jobType || job.jobType;
-        job.experience = experience || job.experience;
-        job.position = position || job.position;
-        job.salary = salary || job.salary;
-
-        await job.save();
-
-        return res.status(200).json({
-            message: "Job updated successfully",
-            success: true,
-            job
+        const job = await Job.findByIdAndUpdate(req.params.id, req.body, {
+            new: true,
+            runValidators: true,
         });
-
+        if (!job) return failure(res, 404, "Job not found");
+        return success(res, 200, "Job updated successfully", { job });
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
+}
 
-};
-
-export const deleteJob = async (req, res) => {
+export async function deleteJob(req, res) {
     try {
-        const jobId = req.params.id;
-
-        const job = await Job.findByIdAndDelete(jobId);
-        if (!job) {
-            return res.status(404).json({
-                message: "Job not found",
-                success: false
-            });
-        }
-
-        return res.status(200).json({
-            message: "Job deleted successfully",
-            success: true
-        });
-
+        const job = await Job.findByIdAndDelete(req.params.id);
+        if (!job) return failure(res, 404, "Job not found");
+        return success(res, 200, "Job deleted successfully");
     } catch (error) {
-        console.log(error);
-        res.status(500).json({
-            message: "Internal server error",
-            success: false
-        });
+        return handleError(res, error);
     }
-
-};
+}

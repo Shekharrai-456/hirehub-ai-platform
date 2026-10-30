@@ -3,43 +3,156 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageShell } from "@/src/components/PageShell";
+import { Icon } from "@/src/components/Icon";
 import { getApplications } from "@/src/lib/api";
+import { useIsMounted } from "@/src/lib/useMounted";
 import type { Application, Job, User } from "@/src/types";
 
 function readUser(): User | null {
   if (typeof window === "undefined") return null;
-  const saved = window.localStorage.getItem("hirehub-user");
-  return saved ? JSON.parse(saved) as User : null;
+  try {
+    const saved = window.localStorage.getItem("hirehub-user");
+    return saved ? (JSON.parse(saved) as User) : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function DashboardPage() {
-  const [user] = useState<User | null>(readUser);
+  const mounted = useIsMounted();
+  const user = mounted ? readUser() : null;
   const [applications, setApplications] = useState<Application[]>([]);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    getApplications(user._id).then(setApplications).catch((reason) => {
-      setError(reason instanceof Error ? reason.message : "Could not load applications.");
-    });
-  }, [user]);
+    if (!user?._id) return;
+    let active = true;
+    getApplications(user._id)
+      .then((data) => {
+        if (active) {
+          setApplications(data);
+          setLoaded(true);
+        }
+      })
+      .catch((reason) => {
+        if (active) {
+          setError(reason instanceof Error ? reason.message : "Could not load applications.");
+          setLoaded(true);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?._id]);
+
+  const interviewCount = applications.filter((a) => a.status === "interview").length;
+  const hiredCount = applications.filter((a) => a.status === "hired").length;
 
   return (
     <PageShell>
       <section className="dashboard-heading">
-        <div><p className="eyebrow">Your workspace</p><h1>{user ? `Welcome, ${user.fullName.split(" ")[0]}.` : "Sign in to see your applications."}</h1><p>Keep track of your real applications and discover your next opportunity.</p></div>
-        <Link className="primary-button" href="/jobs">Find more jobs →</Link>
+        <div>
+          <span className="eyebrow-accent">CANDIDATE DASHBOARD</span>
+          <h1>
+            {mounted && user ? `Welcome back, ${user.fullName.split(" ")[0]}.` : "Candidate Portal"}
+          </h1>
+          <p>Track your submitted applications, interview stages, and profile status.</p>
+        </div>
+        <Link className="primary-button" href="/jobs">
+          Explore Vacancies →
+        </Link>
       </section>
-      {!user && <div className="empty-state"><p>Please sign in before viewing your applications.</p><Link className="primary-button" href="/login">Sign in</Link></div>}
-      {user && <><div className="stats-row"><div><strong>0</strong><span>Saved jobs</span></div><div><strong>{applications.length}</strong><span>Applications sent</span></div><div><strong>—</strong><span>Profile views</span></div></div>
-        <section className="dashboard-section"><div className="results-heading"><h2>Recent applications</h2><span className="muted-text">{error || "Live application data"}</span></div>
-          {applications.length === 0 ? <div className="empty-state"><p>You have not applied to any jobs yet.</p><Link className="primary-button" href="/jobs">Browse jobs</Link></div> : <div className="application-list">{applications.map((application) => {
-            const job = application.job as Job;
-            return <div className="application-row" key={application._id}><div className="company-mark">{job.title[0]}</div><div><strong>{job.title}</strong><p>{job.location}</p></div><span className="status green">{application.status}</span><Link href={`/jobs/${job._id}`}>View →</Link></div>;
-          })}</div>}
-        </section>
-      </>}
-      <section className="tip-card"><strong>Make your profile stand out.</strong><p>Add your skills and a short bio so employers can get to know you.</p><Link href="/profile">Complete profile →</Link></section>
+
+      {mounted && !user && (
+        <div className="empty-state">
+          <h2>Sign in Required</h2>
+          <p>Please sign in to track your job applications and status updates.</p>
+          <Link className="primary-button compact" href="/login">
+            Sign In to Account
+          </Link>
+        </div>
+      )}
+
+      {mounted && user && (
+        <>
+          <div className="stats-row">
+            <div>
+              <strong>{applications.length}</strong>
+              <span>Applications Submitted</span>
+            </div>
+            <div>
+              <strong>{interviewCount}</strong>
+              <span>Interview Invitations</span>
+            </div>
+            <div>
+              <strong>{hiredCount}</strong>
+              <span>Job Offers</span>
+            </div>
+          </div>
+
+          <section className="dashboard-section">
+            <div className="results-heading">
+              <h2>Your Application History</h2>
+              <span className="muted-text">{error || "Real-time application status"}</span>
+            </div>
+
+            {!loaded && (
+              <div className="empty-state">
+                <div className="loader" />
+                <p>Loading your applications...</p>
+              </div>
+            )}
+
+            {loaded && applications.length === 0 ? (
+              <div className="empty-state">
+                <p>You have not applied to any job vacancies yet.</p>
+                <Link className="primary-button compact" href="/jobs">
+                  Browse Active Vacancies
+                </Link>
+              </div>
+            ) : (
+              <div className="application-list">
+                {applications.map((application) => {
+                  const job =
+                    typeof application.job === "object" && application.job !== null
+                      ? (application.job as Job)
+                      : { _id: String(application.job), title: "Job Vacancy", location: "Nepal" };
+
+                  return (
+                    <div className="application-row" key={application._id}>
+                      <div className="company-mark">{(job.title || "J")[0]}</div>
+                      <div className="app-detail-col">
+                        <strong>{job.title}</strong>
+                        <p>{job.location}</p>
+                      </div>
+                      <span className={`status ${application.status === "hired" ? "green" : application.status}`}>
+                        {application.status.toUpperCase()}
+                      </span>
+                      <Link href={`/jobs/${job._id}`} className="accent-link">
+                        View Vacancy →
+                      </Link>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      <section className="tip-card">
+        <div className="tip-card-inner">
+          <Icon name="spark" size={24} />
+          <div>
+            <strong>Enhance your candidate profile with AI matching.</strong>
+            <p>Add your technical skills and a concise summary to rank higher on recruiter candidate searches.</p>
+          </div>
+          <Link href="/profile" className="secondary-button compact">
+            Update Profile
+          </Link>
+        </div>
+      </section>
     </PageShell>
   );
 }

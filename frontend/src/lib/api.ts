@@ -2,116 +2,125 @@ import type { Application, Company, Job, User } from "@/src/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
-type RequestOptions = RequestInit & { body?: BodyInit | null };
+type Options = Omit<RequestInit, "body"> & { body?: unknown };
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(path: string, options: Options = {}): Promise<T> {
+  const { body, ...requestOptions } = options;
   const response = await fetch(`${API_URL}${path}`, {
-    ...options,
+    ...requestOptions,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...options.headers,
+      ...requestOptions.headers,
     },
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-  const payload = (await response.json().catch(() => ({}))) as T & { message?: string };
-  if (!response.ok) {
-    throw new Error(payload.message ?? "Something went wrong. Please try again.");
-  }
-  return payload;
+  const data = (await response.json().catch(() => ({}))) as T & { message?: string };
+  if (!response.ok) throw new Error(data.message ?? "Request failed");
+  return data;
 }
 
-export async function getJobs(): Promise<Job[]> {
-  const payload = await request<{ jobs: Job[] }>("/job/all");
-  return payload.jobs ?? [];
+const get = <T>(path: string) => request<T>(path);
+const post = <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body });
+const put = <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body });
+
+function listOrEmpty<T>(requestFunction: () => Promise<{ applications?: T[] }>) {
+  return requestFunction()
+    .then((response) => response.applications ?? [])
+    .catch((error: unknown) => {
+      if (error instanceof Error && error.message.includes("No ")) return [];
+      throw error;
+    });
 }
 
-export async function getJob(id: string): Promise<Job | null> {
-  const payload = await request<{ job: Job }>(`/job/${id}`);
-  return payload.job ?? null;
+export async function getJobs(params?: {
+  keyword?: string;
+  location?: string;
+  jobType?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params?.keyword) searchParams.set("keyword", params.keyword);
+  if (params?.location) searchParams.set("location", params.location);
+  if (params?.jobType && params.jobType !== "all") searchParams.set("jobType", params.jobType);
+  const qs = searchParams.toString();
+  const response = await get<{ jobs: Job[] }>(`/job/all${qs ? `?${qs}` : ""}`);
+  return response.jobs ?? [];
+}
+
+export async function getCompanies() {
+  const response = await get<{ companies: Company[] }>("/company/all").catch(() => ({ companies: [] }));
+  return response.companies ?? [];
+}
+
+export async function getJob(id: string) {
+  const response = await get<{ job: Job }>(`/job/${id}`);
+  return response.job ?? null;
 }
 
 export async function getCompanyJobs(companyId: string) {
-  try {
-    const payload = await request<{ jobs: Job[] }>(`/job/company/${companyId}`);
-    return payload.jobs ?? [];
-  } catch (error) {
-    if (error instanceof Error && error.message === "No jobs found for this company") return [];
+  const response = await get<{ jobs: Job[] }>(`/job/company/${companyId}`).catch((error: unknown) => {
+    if (error instanceof Error && error.message === "No jobs found for this company") return { jobs: [] };
     throw error;
-  }
-}
-
-export async function loginUser(email: string, password: string, role: string) {
-  return request<{ user: User; message: string }>("/user/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password, role }),
   });
+  return response.jobs ?? [];
 }
 
-export async function registerUser(data: {
+export function loginUser(email: string, password: string, role: string) {
+  return post<{ user: User; message: string }>("/user/login", { email, password, role });
+}
+
+export function registerUser(data: {
   fullName: string;
   email: string;
   phoneNumber: string;
   password: string;
   role: string;
 }) {
-  return request<{ message: string }>("/user/register", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return post<{ message: string }>("/user/register", data);
 }
 
-export async function logoutUser() {
-  return request<{ message: string }>("/user/logout", { method: "POST" });
+export function logoutUser() {
+  return post<{ message: string }>("/user/logout");
 }
 
-export async function applyForJob(jobId: string) {
-  return request<{ message: string }>("/application/apply/" + jobId, {
-    method: "POST",
-  });
+export function applyForJob(jobId: string) {
+  return post<{ message: string }>(`/application/apply/${jobId}`);
 }
 
-export async function getApplications(userId: string) {
-  try {
-    const payload = await request<{ applications: Application[] }>(`/application/user/${userId}`);
-    return payload.applications ?? [];
-  } catch (error) {
-    if (error instanceof Error && error.message === "No applications found for this user") return [];
-    throw error;
-  }
+export function getApplications(userId: string) {
+  return listOrEmpty<Application>(() =>
+    get<{ applications: Application[] }>(`/application/user/${userId}`),
+  );
 }
 
-export async function getApplicants(jobId: string) {
-  try {
-    const payload = await request<{ applications: Application[] }>(`/application/job/${jobId}`);
-    return payload.applications ?? [];
-  } catch (error) {
-    if (error instanceof Error && error.message === "No applicants found for this job") return [];
-    throw error;
-  }
+export function getApplicants(jobId: string) {
+  return listOrEmpty<Application>(() =>
+    get<{ applications: Application[] }>(`/application/job/${jobId}`),
+  );
 }
 
-export async function updateApplicationStatus(applicationId: string, status: Application["status"]) {
-  return request<{ application: Application }>(`/application/${applicationId}/status`, {
-    method: "PUT",
-    body: JSON.stringify({ applicationId, status }),
-  });
+export function updateApplicationStatus(
+  applicationId: string,
+  status: Application["status"],
+) {
+  return put<{ application: Application }>(
+    `/application/${applicationId}/status`,
+    { applicationId, status },
+  );
 }
 
-export async function updateUserProfile(data: {
+export function updateUserProfile(data: {
   fullName: string;
   email: string;
   phoneNumber: string;
   bio: string;
   skills: string;
 }) {
-  return request<{ user: User }>("/user/profile/update", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return post<{ user: User }>("/user/profile/update", data);
 }
 
-export async function createJob(data: {
+export function createJob(data: {
   title: string;
   description: string;
   requirements: string;
@@ -123,42 +132,30 @@ export async function createJob(data: {
   skills: string;
   company: string;
 }) {
-  return request<{ job: Job }>("/job/create", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return post<{ job: Job }>("/job/create", data);
 }
 
-export async function loginCompany(email: string, password: string) {
-  return request<{ company: Company; message: string }>("/company/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
+export function loginCompany(email: string, password: string) {
+  return post<{ company: Company; message: string }>("/company/login", { email, password });
 }
 
-export async function registerCompany(data: {
+export function registerCompany(data: {
   companyName: string;
   email: string;
   phoneNumber: string;
   password: string;
 }) {
-  return request<{ message: string }>("/company/register", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return post<{ message: string }>("/company/register", data);
 }
 
-export async function logoutCompany() {
-  return request<{ message: string }>("/company/logout", { method: "POST" });
+export function logoutCompany() {
+  return post<{ message: string }>("/company/logout");
 }
 
-export async function updateCompanyProfile(data: {
+export function updateCompanyProfile(data: {
   companyName: string;
   email: string;
   phoneNumber: string;
 }) {
-  return request<{ company: Company }>("/company/profile/update", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  return post<{ company: Company }>("/company/profile/update", data);
 }

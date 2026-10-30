@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 
 const userSchema = new mongoose.Schema({
     fullName: {
@@ -12,7 +11,7 @@ const userSchema = new mongoose.Schema({
         unique: true,
     },
     phoneNumber: {
-        type: Number,
+        type: String,
         required: true,
     },
     password: {
