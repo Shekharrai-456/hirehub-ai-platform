@@ -1,11 +1,10 @@
-
 "use client";
 
 import type { ChangeEvent, FormEvent, MouseEvent } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/src/components/Icon";
-import { loginUser, registerUser } from "@/src/lib/api";
+import { loginCompany, loginUser, registerCompany, registerUser } from "@/src/lib/api";
 import type { Role, User } from "@/src/types";
 
 type AuthMode = "login" | "register";
@@ -36,8 +35,10 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
   const [form, setForm] = useState<FormValues>(emptyForm);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const isRegistering = mode === "register";
+  const isRecruiter = role === "recruiter";
 
   function updateField(event: ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target;
@@ -49,15 +50,35 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
     setError("");
   }
 
+  function handleDemoFill(demoRole: "user" | "recruiter") {
+    setError("");
+    if (demoRole === "user") {
+      setRole("user");
+      setForm({
+        fullName: "Aarav Sharma",
+        email: "aarav.sharma@example.com",
+        phoneNumber: "9841234567",
+        password: "password123",
+      });
+    } else {
+      setRole("recruiter");
+      setForm({
+        fullName: "WorldLink Communications",
+        email: "careers@worldlink.com.np",
+        phoneNumber: "9801234567",
+        password: "hirehub123",
+      });
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
 
     try {
-      if (role === "recruiter") {
+      if (isRecruiter) {
         if (isRegistering) {
-          const { registerCompany } = await import("@/src/lib/api");
           await registerCompany({
             companyName: form.fullName,
             email: form.email,
@@ -71,7 +92,6 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
           }));
           return;
         } else {
-          const { loginCompany } = await import("@/src/lib/api");
           const response = await loginCompany(form.email, form.password);
           window.localStorage.setItem("hirehub-company", JSON.stringify(response.company));
           onClose();
@@ -82,7 +102,7 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
       }
 
       if (isRegistering) {
-        await registerUser({ ...form, role });
+        await registerUser({ ...form, role: "user" });
         setMode("login");
         setForm((currentForm) => ({
           ...emptyForm,
@@ -91,8 +111,10 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
         return;
       }
 
-      const response = await loginUser(form.email, form.password, role);
+      const response = await loginUser(form.email, form.password, "user");
+      window.localStorage.setItem("hirehub-user", JSON.stringify(response.user));
       onLogin(response.user);
+      onClose();
     } catch (requestError) {
       const message =
         requestError instanceof Error
@@ -112,105 +134,174 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
 
   return (
     <div className="modal-backdrop" onMouseDown={handleBackdropClick}>
-      <section className="auth-modal" aria-labelledby="auth-title">
+      <section className="auth-modal modal-enhanced" aria-labelledby="auth-title">
         <button
           type="button"
           className="icon-button modal-close"
           onClick={onClose}
           aria-label="Close authentication dialog"
         >
-          <Icon name="close" />
+          <Icon name="close" size={20} />
         </button>
 
         <div className="modal-heading">
-          <span className="logo-mark small">H</span>
-          <p className="eyebrow">Welcome to HireHub</p>
+          <div className="brand modal-brand">
+            <span className="logo-mark">H</span>
+            <span>hire<span className="brand-accent">hub</span></span>
+          </div>
+          <span className="eyebrow-accent">
+            {isRegistering ? "CREATE ACCOUNT" : "WELCOME BACK"}
+          </span>
           <h2 id="auth-title">
-            {isRegistering ? "Create your account." : "Find work you love."}
+            {isRegistering
+              ? isRecruiter
+                ? "Register as Employer"
+                : "Register as Candidate"
+              : isRecruiter
+                ? "Sign In to Recruiter Hub"
+                : "Sign In to Candidate Portal"}
           </h2>
         </div>
 
+        {/* Mode Toggle (Sign in vs Register) */}
         <div className="segmented">
           <button
             type="button"
             className={mode === "login" ? "active" : ""}
             onClick={() => changeMode("login")}
           >
-            Sign in
+            Sign In
           </button>
           <button
             type="button"
             className={isRegistering ? "active" : ""}
             onClick={() => changeMode("register")}
           >
-            Create account
+            Create Account
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {/* Role Toggle (Job Seeker vs Employer) */}
+        <div className="modal-role-row">
+          <button
+            type="button"
+            className={`modal-role-pill ${!isRecruiter ? "active" : ""}`}
+            onClick={() => setRole("user")}
+          >
+            <Icon name="user" size={14} />
+            <span>Job Seeker</span>
+          </button>
+          <button
+            type="button"
+            className={`modal-role-pill ${isRecruiter ? "active" : ""}`}
+            onClick={() => setRole("recruiter")}
+          >
+            <Icon name="building" size={14} />
+            <span>Employer</span>
+          </button>
+        </div>
+
+        {/* Demo Credentials Quick Pill */}
+        <div className="modal-demo-strip">
+          <span>Demo:</span>
+          <button type="button" onClick={() => handleDemoFill("user")}>
+            Candidate
+          </button>
+          <button type="button" onClick={() => handleDemoFill("recruiter")}>
+            Recruiter
+          </button>
+        </div>
+
+        {error && (
+          <div className="auth-alert error compact" role="alert">
+            <Icon name="close" size={14} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="modal-form">
           {isRegistering && (
-            <label>
-              Full name
-              <input
-                name="fullName"
-                value={form.fullName}
-                onChange={updateField}
-                required
-                autoComplete="name"
-              />
-            </label>
+            <div className="auth-field compact">
+              <label>
+                {isRecruiter ? "Company Name" : "Full Name"}
+              </label>
+              <div className="input-group-box">
+                <span className="input-icon">
+                  <Icon name={isRecruiter ? "building" : "user"} size={14} />
+                </span>
+                <input
+                  name="fullName"
+                  value={form.fullName}
+                  onChange={updateField}
+                  required
+                  placeholder={isRecruiter ? "e.g. WorldLink Communications" : "e.g. Aarav Sharma"}
+                  autoComplete="name"
+                />
+              </div>
+            </div>
           )}
 
-          <label>
-            Email address
-            <input
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={updateField}
-              required
-              autoComplete="email"
-            />
-          </label>
-
-          {isRegistering && (
-            <label>
-              Phone number
+          <div className="auth-field compact">
+            <label>Email Address</label>
+            <div className="input-group-box">
+              <span className="input-icon">
+                <Icon name="mail" size={14} />
+              </span>
               <input
-                name="phoneNumber"
-                value={form.phoneNumber}
+                name="email"
+                type="email"
+                value={form.email}
                 onChange={updateField}
                 required
-                autoComplete="tel"
+                placeholder={isRecruiter ? "careers@company.com.np" : "name@example.com"}
+                autoComplete="email"
               />
-            </label>
+            </div>
+          </div>
+
+          {isRegistering && (
+            <div className="auth-field compact">
+              <label>Phone Number</label>
+              <div className="input-group-box">
+                <span className="input-addon">+977</span>
+                <input
+                  name="phoneNumber"
+                  value={form.phoneNumber}
+                  onChange={updateField}
+                  required
+                  placeholder="98XXXXXXXX"
+                  autoComplete="tel"
+                />
+              </div>
+            </div>
           )}
 
-          <label>
-            Password
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={updateField}
-              required
-              minLength={6}
-              autoComplete={isRegistering ? "new-password" : "current-password"}
-            />
-          </label>
-
-          <label>
-            Continue as
-            <select
-              value={role}
-              onChange={(event) => setRole(event.target.value as Role)}
-            >
-              <option value="user">Job seeker</option>
-              <option value="recruiter">Recruiter</option>
-            </select>
-          </label>
-
-          {error && <p className="form-error" role="alert">{error}</p>}
+          <div className="auth-field compact">
+            <label>Password</label>
+            <div className="input-group-box">
+              <span className="input-icon">
+                <Icon name="lock" size={14} />
+              </span>
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={updateField}
+                required
+                minLength={6}
+                placeholder="At least 6 characters"
+                autoComplete={isRegistering ? "new-password" : "current-password"}
+              />
+              <button
+                type="button"
+                className="password-toggle-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                <Icon name={showPassword ? "eyeOff" : "eye"} size={14} />
+              </button>
+            </div>
+          </div>
 
           <button
             type="submit"
@@ -218,13 +309,18 @@ export function AuthModal({ onClose, onLogin }: AuthModalProps) {
             disabled={isSubmitting}
           >
             {isSubmitting
-              ? "Please wait..."
+              ? "Authenticating..."
               : isRegistering
-                ? "Create account"
-                : "Sign in"}
-            <Icon name="arrow" size={16} />
+                ? "Create Account"
+                : "Sign In"}
+            <Icon name="arrow" size={15} />
           </button>
         </form>
+
+        <div className="modal-trust-footer">
+          <Icon name="badgeCheck" size={13} />
+          <span>Verified &amp; Secure Authentication</span>
+        </div>
       </section>
     </div>
   );
