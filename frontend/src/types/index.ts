@@ -15,7 +15,7 @@ export type Company = {
 
 export type Application = {
   _id: string;
-  status: "applied" | "interview" | "hired" | "rejected";
+  status: "applied" | "interview" | "hired" | "rejected" | "withdrawn";
   applicant: User | string;
   job: Job | string;
   createdAt?: string;
@@ -48,5 +48,11 @@ export type User = {
   profile?: {
     bio?: string;
     skills?: string[];
+    resume?: string;
+    resumeOriginalName?: string;
+    company?: string | Company;
+    profilePicture?: string;
   };
+  savedJobs?: (string | Job)[];
 };
+

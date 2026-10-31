@@ -3,7 +3,7 @@ import { failure, handleError, success } from "../src/utils/http.js";
 
 import mongoose from "mongoose";
 
-const companyFields = "companyName email phoneNumber location industry logo website";
+const companyFields = "companyName email phoneNumber location industry logo website description size";
 
 function toList(value) {
     if (Array.isArray(value)) return value;

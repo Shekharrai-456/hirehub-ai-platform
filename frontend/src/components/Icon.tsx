@@ -57,21 +57,33 @@ const paths: Record<IconName, string> = {
   lock: "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
 };
 
-export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
+export function Icon({
+  name,
+  size = 18,
+  fill = "none",
+  className,
+}: {
+  name: IconName;
+  size?: number;
+  fill?: string;
+  className?: string;
+}) {
   const path = paths[name] || paths.briefcase;
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={fill}
       stroke="currentColor"
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      className={className}
     >
       <path d={path} />
     </svg>
   );
 }
+

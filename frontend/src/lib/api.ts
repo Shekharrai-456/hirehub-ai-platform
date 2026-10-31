@@ -1,6 +1,7 @@
 import type { Application, Company, Job, User } from "@/src/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+export const API_BASE = API_URL.replace(/\/api\/v1\/?$/, "");
 
 type Options = Omit<RequestInit, "body"> & { body?: unknown };
 
@@ -21,9 +22,21 @@ async function request<T>(path: string, options: Options = {}): Promise<T> {
   return data;
 }
 
+async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  const data = (await response.json().catch(() => ({}))) as T & { message?: string };
+  if (!response.ok) throw new Error(data.message ?? "Upload failed");
+  return data;
+}
+
 const get = <T>(path: string) => request<T>(path);
 const post = <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body });
 const put = <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body });
+const del = <T>(path: string) => request<T>(path, { method: "DELETE" });
 
 function listOrEmpty<T>(requestFunction: () => Promise<{ applications?: T[] }>) {
   return requestFunction()
@@ -153,9 +166,47 @@ export function logoutCompany() {
 }
 
 export function updateCompanyProfile(data: {
-  companyName: string;
-  email: string;
-  phoneNumber: string;
+  companyName?: string;
+  email?: string;
+  phoneNumber?: string;
+  location?: string;
+  website?: string;
+  industry?: string;
+  size?: string;
+  description?: string;
+  companyId?: string;
+  _id?: string;
 }) {
-  return post<{ company: Company }>("/company/profile/update", data);
+  const targetId = data.companyId || data._id;
+  const path = targetId ? `/company/profile/update/${targetId}` : "/company/profile/update";
+  return post<{ company: Company }>(path, data);
 }
+
+export function getCompany(id: string) {
+  return get<{ company: Company }>(`/company/${id}`).then((res) => res.company);
+}
+
+export function uploadResume(formData: FormData) {
+  return uploadRequest<{ user: User; resume: string; resumeOriginalName: string; message: string }>(
+    "/user/profile/resume",
+    formData,
+  );
+}
+
+export function uploadCompanyLogo(formData: FormData, companyId?: string) {
+  const path = companyId ? `/company/profile/logo/${companyId}` : "/company/profile/logo";
+  return uploadRequest<{ company: Company; logo: string; message: string }>(path, formData);
+}
+
+export function toggleBookmark(jobId: string) {
+  return post<{ savedJobs: string[]; bookmarked: boolean; message: string }>(`/user/bookmark/${jobId}`);
+}
+
+export function getSavedJobs() {
+  return get<{ savedJobs: Job[] }>("/user/saved-jobs").then((res) => res.savedJobs ?? []);
+}
+
+export function withdrawApplication(applicationId: string) {
+  return del<{ message: string }>(`/application/withdraw/${applicationId}`);
+}
+

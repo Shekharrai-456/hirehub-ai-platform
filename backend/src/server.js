@@ -2,6 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import connectDB from "./utils/db.js";
 import userRoutes from "./routes/user.routes.js";
 import companyRoutes from "./routes/company.routes.js";
@@ -11,11 +13,16 @@ import applicationRoutes from "./routes/application.route.js";
 dotenv.config();
 const app = express();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Static uploads serving
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 const corsOptions = {
     origin: ["http://localhost:3000", "http://localhost:5173"],
