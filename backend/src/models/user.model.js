@@ -32,10 +32,6 @@ const userSchema = new mongoose.Schema({
         company: {type: mongoose.Schema.Types.ObjectId, ref: 'Company'}, // For recruiters
         profilePicture: {type: String, default: ""}, // URL or path to the profile picture
     },
-    savedJobs: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Job",
-    }],
 }, { timestamps: true });
 
 export const User = mongoose.model("User", userSchema);

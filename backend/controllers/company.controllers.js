@@ -75,10 +75,9 @@ export function logoutCompany(req, res) {
 
 export async function getCompanyById(req, res) {
     try {
-        const targetId = req.params.id || req.companyId;
-        const company = await Company.findById(targetId);
+        const company = await Company.findById(req.companyId || req.params.id);
         if (!company) return failure(res, 404, "Company not found");
-        return success(res, 200, "Company fetched successfully", { company: publicCompany(company) });
+        return success(res, 200, "Company fetched successfully", { company });
     } catch (error) {
         return handleError(res, error);
     }
@@ -86,55 +85,13 @@ export async function getCompanyById(req, res) {
 
 export async function updateCompanyProfile(req, res) {
     try {
-        const targetId = req.params.id || req.companyId || req.body.companyId || req.body._id;
-        if (!targetId) {
-            return failure(res, 400, "Company ID is required");
-        }
-        const { companyName, email, phoneNumber, location, website, industry, size, description } = req.body;
-        const updateData = {};
-        if (companyName) updateData.companyName = companyName;
-        if (email) updateData.email = email;
-        if (phoneNumber) updateData.phoneNumber = phoneNumber;
-        if (location !== undefined) updateData.location = location;
-        if (website !== undefined) updateData.website = website;
-        if (industry !== undefined) updateData.industry = industry;
-        if (size !== undefined) updateData.size = size;
-        if (description !== undefined) updateData.description = description;
-
         const company = await Company.findByIdAndUpdate(
-            targetId,
-            updateData,
+            req.companyId || req.params.id,
+            req.body,
             { new: true, runValidators: true },
         );
         if (!company) return failure(res, 404, "Company not found");
         return success(res, 200, "Company profile updated successfully", { company: publicCompany(company) });
-    } catch (error) {
-        return handleError(res, error);
-    }
-}
-
-export async function uploadCompanyLogo(req, res) {
-    try {
-        if (!req.file) {
-            return failure(res, 400, "No logo file uploaded");
-        }
-        const targetId = req.params.id || req.companyId || req.body.companyId;
-        if (!targetId) {
-            return failure(res, 400, "Company ID is required");
-        }
-
-        const logoUrl = `/uploads/logos/${req.file.filename}`;
-        const company = await Company.findByIdAndUpdate(
-            targetId,
-            { logo: logoUrl },
-            { new: true }
-        );
-        if (!company) return failure(res, 404, "Company not found");
-
-        return success(res, 200, "Company logo uploaded successfully", {
-            company: publicCompany(company),
-            logo: logoUrl,
-        });
     } catch (error) {
         return handleError(res, error);
     }
@@ -150,5 +107,4 @@ export async function getAllCompanies(req, res) {
         return handleError(res, error);
     }
 }
-
 

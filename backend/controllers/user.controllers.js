@@ -11,7 +11,6 @@ function publicUser(user) {
         phoneNumber: user.phoneNumber,
         role: user.role,
         profile: user.profile,
-        savedJobs: user.savedJobs || [],
     };
 }
 
@@ -106,73 +105,3 @@ export async function updateProfile(req, res) {
         return handleError(res, error);
     }
 }
-
-export async function uploadResume(req, res) {
-    try {
-        if (!req.file) {
-            return failure(res, 400, "No resume file uploaded");
-        }
-        const user = await User.findById(req.id);
-        if (!user) return failure(res, 404, "User not found");
-
-        user.profile = user.profile || {};
-        user.profile.resume = `/uploads/resumes/${req.file.filename}`;
-        user.profile.resumeOriginalName = req.file.originalname;
-        await user.save();
-
-        return success(res, 200, "Resume uploaded successfully", {
-            user: publicUser(user),
-            resume: user.profile.resume,
-            resumeOriginalName: user.profile.resumeOriginalName,
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-}
-
-export async function toggleBookmarkJob(req, res) {
-    try {
-        const { jobId } = req.params;
-        const user = await User.findById(req.id);
-        if (!user) return failure(res, 404, "User not found");
-
-        user.savedJobs = user.savedJobs || [];
-        const index = user.savedJobs.findIndex((id) => id.toString() === jobId);
-        let bookmarked = false;
-        if (index > -1) {
-            user.savedJobs.splice(index, 1);
-            bookmarked = false;
-        } else {
-            user.savedJobs.push(jobId);
-            bookmarked = true;
-        }
-        await user.save();
-
-        return success(res, 200, bookmarked ? "Job saved to bookmarks" : "Job removed from bookmarks", {
-            savedJobs: user.savedJobs,
-            bookmarked,
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-}
-
-export async function getSavedJobs(req, res) {
-    try {
-        const user = await User.findById(req.id).populate({
-            path: "savedJobs",
-            populate: {
-                path: "company",
-                select: "companyName email phoneNumber location industry logo website description size",
-            },
-        });
-        if (!user) return failure(res, 404, "User not found");
-
-        return success(res, 200, "Saved jobs retrieved successfully", {
-            savedJobs: user.savedJobs || [],
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-}
-

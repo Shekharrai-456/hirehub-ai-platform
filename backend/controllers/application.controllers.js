@@ -2,7 +2,7 @@ import { Application } from "../src/models/application.model.js";
 import { Job } from "../src/models/job.model.js";
 import { failure, handleError, success } from "../src/utils/http.js";
 
-const validStatuses = ["applied", "interview", "hired", "rejected", "withdrawn"];
+const validStatuses = ["applied", "interview", "hired", "rejected"];
 
 export async function applyJob(req, res) {
     try {
@@ -81,29 +81,3 @@ export async function updateApplicationStatus(req, res) {
         return handleError(res, error);
     }
 }
-
-export async function withdrawApplication(req, res) {
-    try {
-        const { applicationId } = req.params;
-        const userId = req.id;
-        if (!applicationId) return failure(res, 400, "Application ID is required");
-
-        const application = await Application.findById(applicationId);
-        if (!application) return failure(res, 404, "Application not found");
-
-        if (application.applicant.toString() !== userId) {
-            return failure(res, 403, "You can only withdraw your own applications");
-        }
-
-        await Job.findByIdAndUpdate(application.job, {
-            $pull: { applications: application._id },
-        });
-
-        await Application.findByIdAndDelete(applicationId);
-
-        return success(res, 200, "Application withdrawn successfully");
-    } catch (error) {
-        return handleError(res, error);
-    }
-}
-
