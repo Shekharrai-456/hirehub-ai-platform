@@ -9,6 +9,7 @@ import {
   applyForJob,
   getApplications,
   getJobs,
+  loginUser,
   toggleActivelySeeking,
   toggleSaveJob,
   updateUserProfile as updateProfile,
@@ -395,24 +396,117 @@ function JobseekerOverviewContent() {
   const shortlistedCount = applications.filter((a) => a.status === "shortlisted").length;
   const profileViews = user?.profile?.profileViews || 24;
 
-  if (mounted && !user) {
+  // Quick 1-click Demo Login handler for instant access
+  const handleDemoLogin = async () => {
+    try {
+      setSavingAction("demoLogin");
+      const result = await loginUser("aarav.sharma@example.com", "password123", "user");
+      updateSessionState(result.user);
+      showToast(`Welcome back, ${result.user.fullName}! Loading candidate portal...`);
+    } catch {
+      // Offline fallback state with full realistic Nepali candidate profile
+      const fallbackUser: User = {
+        _id: "6ae61e96de60c3c200ef39bb",
+        fullName: "Aarav Sharma",
+        email: "aarav.sharma@example.com",
+        phoneNumber: "9841234567",
+        role: "user",
+        profile: {
+          preferredJob: {
+            category: "Information Technology",
+            location: "Kathmandu",
+            expectedSalary: "60,000 - 90,000",
+            jobLevel: "Mid Level",
+            jobType: "full-time",
+          },
+          bio: "Full Stack Engineer with 3+ years experience building React, Next.js, Node.js and scalable web applications.",
+          resumeOriginalName: "Aarav_Sharma_CV_2026.pdf",
+          activelySeeking: true,
+          savedJobs: [],
+          profileViews: 48,
+          skills: ["React", "TypeScript", "Node.js", "Next.js", "PostgreSQL", "Tailwind CSS"],
+          jobAlerts: [
+            {
+              _id: "alert-demo-1",
+              category: "Information Technology",
+              keyword: "React, Next.js",
+              frequency: "daily",
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        },
+      };
+      updateSessionState(fallbackUser);
+      showToast("Signed in as Aarav Sharma (Demo Mode)!");
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
+  if (!mounted) {
     return (
       <PageShell>
         <div className="merojob-unauth-container">
-          <div className="empty-state">
-            <Icon name="lock" size={42} />
+          <div className="loader" />
+          <p style={{ marginTop: 12, color: "var(--text-muted)" }}>Loading Jobseeker Portal...</p>
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (!user) {
+    return (
+      <PageShell>
+        <div className="merojob-unauth-container">
+          <div className="unauth-hero-card">
+            <div className="unauth-badge-icon">
+              <Icon name="lock" size={30} />
+            </div>
+            <span className="eyebrow-accent">CANDIDATE CONTROL CENTER</span>
             <h2>Jobseeker Sign In Required</h2>
             <p>
-              Please sign in to access your Merojob Jobseeker Overview, review matched jobs, and track
-              application statuses.
+              Please sign in to access your Merojob Jobseeker Overview, review smart matched jobs,
+              track application statuses across the ATS pipeline, and manage job alerts.
             </p>
+
+            <div className="demo-instant-login-box">
+              <div className="demo-user-chip">
+                <div className="avatar-circle compact">A</div>
+                <div>
+                  <strong>Aarav Sharma (Demo Candidate)</strong>
+                  <span>Full Stack Developer • Kathmandu</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="primary-button full-width"
+                onClick={handleDemoLogin}
+                disabled={savingAction === "demoLogin"}
+              >
+                <Icon name="spark" size={16} />
+                {savingAction === "demoLogin" ? "Signing In..." : "1-Click Demo Login as Aarav Sharma"}
+              </button>
+            </div>
+
             <div className="empty-state-actions">
-              <Link className="primary-button" href="/login">
+              <Link className="secondary-button" href="/login">
                 Sign In to Account
               </Link>
               <Link className="secondary-button" href="/register">
                 Register Free
               </Link>
+            </div>
+
+            <div className="unauth-perks-row">
+              <div className="perk-item">
+                <Icon name="zap" size={14} /> Smart Match (90%+)
+              </div>
+              <div className="perk-item">
+                <Icon name="clock" size={14} /> ATS Stepper Tracker
+              </div>
+              <div className="perk-item">
+                <Icon name="bell" size={14} /> Instant Job Alerts
+              </div>
             </div>
           </div>
         </div>
@@ -460,16 +554,20 @@ function JobseekerOverviewContent() {
               className={`nav-item ${activeTab === "overview" ? "active" : ""}`}
               onClick={() => setActiveTab("overview")}
             >
-              <Icon name="spark" size={18} />
-              <span>Overview</span>
+              <span>
+                <Icon name="spark" size={18} />
+                Overview
+              </span>
             </button>
 
             <button
               className={`nav-item ${activeTab === "matched" ? "active" : ""}`}
               onClick={() => setActiveTab("matched")}
             >
-              <Icon name="briefcase" size={18} />
-              <span>Matching Jobs</span>
+              <span>
+                <Icon name="briefcase" size={18} />
+                Matching Jobs
+              </span>
               {matchedJobs.length > 0 && <span className="nav-badge primary">{matchedJobs.length}</span>}
             </button>
 
@@ -477,8 +575,10 @@ function JobseekerOverviewContent() {
               className={`nav-item ${activeTab === "applications" ? "active" : ""}`}
               onClick={() => setActiveTab("applications")}
             >
-              <Icon name="clock" size={18} />
-              <span>Applied Jobs</span>
+              <span>
+                <Icon name="clock" size={18} />
+                Applied Jobs
+              </span>
               {applications.length > 0 && <span className="nav-badge">{applications.length}</span>}
             </button>
 
@@ -486,8 +586,10 @@ function JobseekerOverviewContent() {
               className={`nav-item ${activeTab === "saved" ? "active" : ""}`}
               onClick={() => setActiveTab("saved")}
             >
-              <Icon name="bookmark" size={18} />
-              <span>Saved Jobs</span>
+              <span>
+                <Icon name="bookmark" size={18} />
+                Saved Jobs
+              </span>
               {savedJobsList.length > 0 && <span className="nav-badge">{savedJobsList.length}</span>}
             </button>
 
@@ -495,16 +597,20 @@ function JobseekerOverviewContent() {
               className={`nav-item ${activeTab === "preferences" ? "active" : ""}`}
               onClick={() => setActiveTab("preferences")}
             >
-              <Icon name="sliders" size={18} />
-              <span>Preferred Jobs</span>
+              <span>
+                <Icon name="sliders" size={18} />
+                Preferred Jobs
+              </span>
             </button>
 
             <button
               className={`nav-item ${activeTab === "alerts" ? "active" : ""}`}
               onClick={() => setActiveTab("alerts")}
             >
-              <Icon name="bell" size={18} />
-              <span>Job Alerts</span>
+              <span>
+                <Icon name="bell" size={18} />
+                Job Alerts
+              </span>
               {(user?.profile?.jobAlerts?.length || 0) > 0 && (
                 <span className="nav-badge">{user?.profile?.jobAlerts?.length}</span>
               )}
@@ -514,8 +620,10 @@ function JobseekerOverviewContent() {
               className={`nav-item ${activeTab === "performance" ? "active" : ""}`}
               onClick={() => setActiveTab("performance")}
             >
-              <Icon name="eye" size={18} />
-              <span>Profile Views</span>
+              <span>
+                <Icon name="eye" size={18} />
+                Profile Views
+              </span>
               <span className="nav-badge success">+{profileViews}</span>
             </button>
           </nav>
@@ -541,7 +649,7 @@ function JobseekerOverviewContent() {
             <div>
               <span className="eyebrow-accent">JOBSEEKER PORTAL</span>
               <h1>
-                Namaste, <em>{user?.fullName.split(" ")[0]}</em>
+                Namaste, <em>{user?.fullName ? user.fullName.split(" ")[0] : "Candidate"}</em>
               </h1>
               <p>Your centralized job hunting control center &amp; employer activity overview.</p>
             </div>
