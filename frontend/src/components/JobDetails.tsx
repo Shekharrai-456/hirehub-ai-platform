@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PageShell } from "@/src/components/PageShell";
 import { Icon } from "@/src/components/Icon";
-import { applyForJob, getJob } from "@/src/lib/api";
+import { applyForJob, getJob, toggleSaveJob } from "@/src/lib/api";
 import type { Job, User } from "@/src/types";
 
 export function JobDetails({ id }: { id: string }) {
@@ -23,12 +23,27 @@ export function JobDetails({ id }: { id: string }) {
       return null;
     }
   });
+  const [isSaved, setIsSaved] = useState(() => Boolean(user?.profile?.savedJobs?.includes(id)));
 
   useEffect(() => {
     getJob(id)
       .then(setJob)
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleToggleBookmark() {
+    if (!user) {
+      router.push(`/login?redirect=/jobs/${id}`);
+      return;
+    }
+    const nextSaved = !isSaved;
+    setIsSaved(nextSaved);
+    try {
+      await toggleSaveJob(id);
+    } catch {
+      // optimistic UI
+    }
+  }
 
   async function handleApply() {
     if (!user) {
@@ -104,7 +119,7 @@ export function JobDetails({ id }: { id: string }) {
 
       <div className="merojob-detail-layout">
         <div className="detail-main-column">
-          {/* Header Banner */}
+          {/* Header Hero Card */}
           <div className="job-hero-card">
             <div className="job-hero-top">
               <div className="hero-logo-box">
@@ -116,163 +131,218 @@ export function JobDetails({ id }: { id: string }) {
                 )}
               </div>
               <div className="hero-text-box">
-                <span className="eyebrow-accent">{job.category || "Career Vacancy"}</span>
-                <h1 className="job-hero-title">{job.title}</h1>
-                <div className="hero-company-line">
-                  <strong>{company.companyName}</strong>
-                  <span className="verified-badge"><Icon name="badgeCheck" size={13} /> Verified Employer</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                  <div>
+                    <span className="eyebrow-accent">{job.category || "Career Vacancy"}</span>
+                    <h1 className="job-hero-title">{job.title}</h1>
+                    <div className="hero-company-line">
+                      <strong>{company.companyName}</strong>
+                      <span className="verified-icon" title="Verified Employer">
+                        <Icon name="badgeCheck" size={15} />
+                      </span>
+                      <span>• {job.location}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`bookmark-action-btn ${isSaved ? "saved" : ""}`}
+                    onClick={handleToggleBookmark}
+                    title={isSaved ? "Remove from bookmarks" : "Bookmark this vacancy"}
+                    style={{
+                      padding: "8px 12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "12.5px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Icon name="bookmark" size={16} />
+                    <span>{isSaved ? "Bookmarked" : "Save Job"}</span>
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="job-highlights-row">
-              <div className="highlight-pill">
-                <Icon name="map" size={15} />
-                <span>{job.location}</span>
+            {/* Metric Specifications Grid */}
+            <div className="job-spec-grid">
+              <div className="spec-item">
+                <div className="spec-icon-box">
+                  <Icon name="dollar" size={16} />
+                </div>
+                <div>
+                  <span className="spec-label">Offered Salary</span>
+                  <strong className="spec-val">
+                    {job.salary ? `Rs. ${job.salary.toLocaleString()}` : "Negotiable"}
+                  </strong>
+                </div>
               </div>
-              <div className="highlight-pill">
-                <Icon name="briefcase" size={15} />
-                <span>{job.jobType}</span>
+
+              <div className="spec-item">
+                <div className="spec-icon-box">
+                  <Icon name="briefcase" size={16} />
+                </div>
+                <div>
+                  <span className="spec-label">Employment Type</span>
+                  <strong className="spec-val capitalize">{job.jobType}</strong>
+                </div>
               </div>
-              <div className="highlight-pill">
-                <Icon name="spark" size={15} />
-                <span>{job.experience}</span>
+
+              <div className="spec-item">
+                <div className="spec-icon-box">
+                  <Icon name="spark" size={16} />
+                </div>
+                <div>
+                  <span className="spec-label">Experience Required</span>
+                  <strong className="spec-val">{job.experience}</strong>
+                </div>
               </div>
-              <div className="highlight-pill highlight-deadline">
-                <Icon name="clock" size={15} />
-                <span>{job.deadline || "Apply Soon"}</span>
+
+              <div className="spec-item">
+                <div className="spec-icon-box">
+                  <Icon name="clock" size={16} />
+                </div>
+                <div>
+                  <span className="spec-label">Apply Deadline</span>
+                  <strong className="spec-val">{job.deadline || "30 days left"}</strong>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Basic Job Information Table (Merojob Specification style) */}
-          <section className="spec-table-card">
-            <h2 className="spec-heading">Basic Job Information</h2>
-            <div className="spec-grid">
-              <div className="spec-cell">
-                <span className="spec-label">Job Category</span>
-                <strong className="spec-val">{job.category || "Information Technology"}</strong>
-              </div>
-              <div className="spec-cell">
-                <span className="spec-label">Job Level</span>
-                <strong className="spec-val">{job.position || "Mid Level"}</strong>
-              </div>
-              <div className="spec-cell">
-                <span className="spec-label">Employment Type</span>
-                <strong className="spec-val">{job.jobType}</strong>
-              </div>
-              <div className="spec-cell">
-                <span className="spec-label">Offered Salary</span>
-                <strong className="spec-val highlight-green">
-                  {job.salary ? `$${job.salary.toLocaleString()} / mo` : "Negotiable"}
-                </strong>
-              </div>
-              <div className="spec-cell">
-                <span className="spec-label">Apply Before</span>
-                <strong className="spec-val">{job.deadline || "30 days remaining"}</strong>
-              </div>
-              <div className="spec-cell">
-                <span className="spec-label">Job Location</span>
-                <strong className="spec-val">{job.location}</strong>
-              </div>
-            </div>
-          </section>
-
           {/* Job Description & Specification */}
-          <section className="detail-section-card">
-            <h2>Job Description</h2>
-            <p className="detail-prose">{job.description}</p>
+          <div className="detail-content-card">
+            <h2 className="detail-section-title">
+              <Icon name="fileText" size={18} /> Job Overview
+            </h2>
+            <div className="detail-prose">
+              <p>{job.description}</p>
+            </div>
 
-            <h2>Job Specification &amp; Requirements</h2>
-            <ul className="requirements-list">
-              {job.requirements.map((req, idx) => (
-                <li key={idx}>
-                  <Icon name="check" size={16} />
-                  <span>{req}</span>
-                </li>
-              ))}
-            </ul>
+            {job.requirements && job.requirements.length > 0 && (
+              <>
+                <h2 className="detail-section-title" style={{ marginTop: "28px" }}>
+                  <Icon name="checkCircle" size={18} /> Requirements &amp; Qualifications
+                </h2>
+                <div className="detail-prose">
+                  <ul>
+                    {job.requirements.map((req, idx) => (
+                      <li key={idx}>{req}</li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
 
             {job.skills && job.skills.length > 0 && (
               <>
-                <h2>Key Competencies &amp; Skills</h2>
-                <div className="skills-badge-wrap">
+                <h2 className="detail-section-title" style={{ marginTop: "28px" }}>
+                  <Icon name="zap" size={18} /> Required Competencies
+                </h2>
+                <div className="card-skills-row" style={{ marginTop: "10px" }}>
                   {job.skills.map((skill) => (
-                    <span key={skill} className="spec-skill-tag">
+                    <span key={skill} className="skill-pill" style={{ padding: "6px 12px", fontSize: "13px" }}>
                       {skill}
                     </span>
                   ))}
                 </div>
               </>
             )}
-          </section>
+          </div>
 
-          {/* About Company */}
-          <section className="detail-section-card">
-            <h2>About {company.companyName}</h2>
-            <p className="detail-prose">
-              {company.description ||
-                `${company.companyName} is an industry-leading organization dedicated to professional growth, modern workplace standards, and talent development.`}
-            </p>
-            <div className="company-info-row">
-              {company.location && <span><strong>Location:</strong> {company.location}</span>}
-              {company.industry && <span><strong>Industry:</strong> {company.industry}</span>}
-              {company.website && (
-                <span>
-                  <strong>Website:</strong>{" "}
-                  <a href={company.website} target="_blank" rel="noopener noreferrer" className="accent-link">
-                    {company.website.replace(/^https?:\/\//, "")}
-                  </a>
-                </span>
-              )}
+          {/* Company Profile Card */}
+          <div className="detail-content-card">
+            <h2 className="detail-section-title">
+              <Icon name="building" size={18} /> About {company.companyName}
+            </h2>
+            <div className="detail-prose">
+              <p>
+                {company.description ||
+                  `${company.companyName} is an industry-recognized employer in Nepal with verified credentials, modern work environment, and clear paths for talent development.`}
+              </p>
             </div>
-          </section>
+            {company.website && (
+              <p style={{ marginTop: "12px", fontSize: "13.5px" }}>
+                <strong>Official Website:</strong>{" "}
+                <a href={company.website} target="_blank" rel="noopener noreferrer" className="accent-link">
+                  {company.website} <Icon name="external" size={12} />
+                </a>
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Right Sticky Sidebar */}
-        <aside className="detail-sidebar-column">
-          <div className="sticky-apply-box">
-            <span className="eyebrow-accent">APPLICATION DEADLINE</span>
-            <div className="deadline-timer">
-              <Icon name="clock" size={20} />
-              <span>{job.deadline || "Open for Applications"}</span>
-            </div>
-
-            <div className="sidebar-salary-summary">
-              <span className="salary-label">Offered Monthly Salary</span>
-              <h3 className="salary-figure">
-                {job.salary ? `$${job.salary.toLocaleString()}` : "Negotiable"}
-              </h3>
+        {/* Right Sidebar */}
+        <aside className="detail-sidebar">
+          <div className="sidebar-action-card">
+            <div className="apply-card-top">
+              <span className="eyebrow-accent">APPLICATION STATUS</span>
+              <h3>Interested in this role?</h3>
+              <p>Applications are reviewed directly by the employer hiring team.</p>
             </div>
 
             {applyNotice && (
-              <div className={`apply-alert ${applyNotice.type}`}>
-                <Icon name={applyNotice.type === "success" ? "check" : "close"} size={16} />
-                <span>{applyNotice.message}</span>
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "var(--radius-sm)",
+                  marginBottom: "16px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  backgroundColor: applyNotice.type === "success" ? "var(--success-bg)" : "var(--danger-bg)",
+                  color: applyNotice.type === "success" ? "var(--success)" : "var(--danger)",
+                  border: `1px solid ${applyNotice.type === "success" ? "var(--success-border)" : "var(--danger-border)"}`,
+                }}
+              >
+                {applyNotice.message}
               </div>
             )}
 
             <button
               type="button"
-              className="primary-button full-width"
+              className="primary-button apply-button-large"
               onClick={handleApply}
               disabled={applying}
             >
-              {applying ? "Submitting application..." : user ? "Apply Now →" : "Sign In to Apply"}
+              {applying ? "Submitting Application..." : "Apply for Vacancy"}
             </button>
 
-            {!user && (
-              <p className="sidebar-hint">
-                Don&apos;t have an account? <Link href="/register" className="accent-link">Register free</Link> to apply.
-              </p>
-            )}
-
-            <div className="sidebar-security-badge">
-              <Icon name="badgeCheck" size={16} />
-              <span>Verified Hiring Partner with HireHub</span>
+            <div style={{ marginTop: "18px", textAlign: "center", fontSize: "12px", color: "var(--muted)" }}>
+              <span>Verified vacancy • No application fee</span>
             </div>
           </div>
+
+          <div className="sidebar-info-card">
+            <h4 style={{ fontSize: "14px", fontWeight: 800, margin: "0 0 12px" }}>Vacancy Highlights</h4>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "10px", fontSize: "13px", color: "var(--muted)" }}>
+              <li><strong>Category:</strong> {job.category || "Information Technology"}</li>
+              <li><strong>Location:</strong> {job.location}</li>
+              <li><strong>Level:</strong> {job.position || "Mid Level"}</li>
+              <li><strong>Type:</strong> {job.jobType}</li>
+              <li><strong>Posted:</strong> {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently"}</li>
+            </ul>
+          </div>
         </aside>
+      </div>
+
+      {/* Sticky Bottom Mobile Bar */}
+      <div className="mobile-sticky-apply-bar">
+        <div>
+          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--subtle)", display: "block" }}>Offered Salary</span>
+          <strong style={{ fontSize: "15px", color: "var(--green)" }}>
+            {job.salary ? `Rs. ${job.salary.toLocaleString()}` : "Negotiable"}
+          </strong>
+        </div>
+        <button
+          type="button"
+          className="primary-button compact"
+          onClick={handleApply}
+          disabled={applying}
+        >
+          {applying ? "Applying..." : "Apply Now"}
+        </button>
       </div>
     </PageShell>
   );

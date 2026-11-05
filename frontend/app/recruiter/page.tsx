@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { PageShell } from "@/src/components/PageShell";
+import { Icon } from "@/src/components/Icon";
 import { createJob, getApplicants, getCompanyJobs, updateApplicationStatus } from "@/src/lib/api";
 import { useIsMounted } from "@/src/lib/useMounted";
 import type { Application, Company, Job, User } from "@/src/types";
@@ -50,9 +51,9 @@ export default function RecruiterPage() {
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
-  const loading = false;
   const [applicants, setApplicants] = useState<Record<string, Application[]>>({});
   const [statusMessage, setStatusMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<"jobs" | "applicants">("jobs");
 
   useEffect(() => {
     if (!company?._id) return;
@@ -100,7 +101,6 @@ export default function RecruiterPage() {
     try {
       await updateApplicationStatus(applicationId, newStatus);
       setStatusMessage(`Status updated to ${newStatus}`);
-      // update state
       setApplicants((prev) => {
         const currentList = prev[jobId] || [];
         return {
@@ -115,13 +115,14 @@ export default function RecruiterPage() {
     }
   }
 
-  if (mounted && !company && !loading && user?.role !== "recruiter") {
+  if (mounted && !company && user?.role !== "recruiter") {
     return (
       <PageShell>
-        <div className="empty-state">
-          <h2>Employer Workspace</h2>
+        <div className="empty-state" style={{ margin: "40px 0" }}>
+          <Icon name="building" size={40} />
+          <h2>Employer Workspace Access</h2>
           <p>Please sign in with your Employer or Recruiter account to manage vacancies and candidates.</p>
-          <div className="empty-state-actions">
+          <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
             <Link className="primary-button" href="/login">
               Recruiter Sign In
             </Link>
@@ -146,276 +147,411 @@ export default function RecruiterPage() {
 
   return (
     <PageShell>
-      <section className="dashboard-heading">
-        <div>
-          <span className="eyebrow-accent">EMPLOYER DASHBOARD</span>
-          <h1>
-            {company?.companyName || "Employer Workspace"} <br />
-            <em>Recruitment Hub.</em>
-          </h1>
-          <p>Post verified job openings, monitor applicants, and manage hiring pipelines.</p>
-        </div>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={() => setShowForm(!showForm)}
-        >
-          {showForm ? "Cancel / Close Form" : "Post a New Vacancy +"}
-        </button>
-      </section>
-
-      {/* Metrics Row */}
-      <div className="stats-row">
-        <div>
-          <strong>{jobs.length}</strong>
-          <span>Active Vacancies</span>
-        </div>
-        <div>
-          <strong>{totalApplicantsCount}</strong>
-          <span>Total Applicants</span>
-        </div>
-        <div>
-          <strong>{interviewCount}</strong>
-          <span>Interviews Scheduled</span>
-        </div>
-        <div>
-          <strong>{hiredCount}</strong>
-          <span>Offers Extended</span>
-        </div>
-      </div>
-
-      {message && <p className="form-message">{message}</p>}
-      {statusMessage && <p className="form-message">{statusMessage}</p>}
-
-      {/* Post a Vacancy Form */}
-      {showForm && (
-        <form className="profile-form recruiter-form" onSubmit={submitJob}>
-          <h3>Post a Verified Job Vacancy</h3>
-
-          <div className="form-grid-2">
-            <label>
-              Job Title
-              <input
-                required
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. Senior Backend Engineer"
-              />
-            </label>
-
-            <label>
-              Job Category
-              <select
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              >
-                <option>Information Technology</option>
-                <option>Banking &amp; Financial Services</option>
-                <option>Healthcare &amp; Pharmaceuticals</option>
-                <option>Advertising, Design &amp; Media</option>
-                <option>Education &amp; Non-Profit</option>
-                <option>Sales &amp; Business Development</option>
-                <option>Telecommunications &amp; ISP</option>
-              </select>
-            </label>
+      <div className="recruiter-workspace-layout">
+        {/* Workspace Banner */}
+        <section className="recruiter-hero-banner">
+          <div>
+            <span className="eyebrow-accent" style={{ color: "var(--lime)" }}>
+              EMPLOYER WORKSPACE
+            </span>
+            <h1>{company?.companyName || "Recruiter Dashboard"}</h1>
+            <p>Manage active job vacancies, track candidate applications, and schedule interviews.</p>
           </div>
-
-          <label>
-            Job Description
-            <textarea
-              required
-              rows={4}
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Outline role responsibilities, mission, and day-to-day impact..."
-            />
-          </label>
-
-          <label>
-            Key Requirements (comma separated)
-            <input
-              required
-              placeholder="3+ years experience, Bachelor in CS, Proven team leadership"
-              value={form.requirements}
-              onChange={(e) => setForm({ ...form, requirements: e.target.value })}
-            />
-          </label>
-
-          <div className="form-grid-3">
-            <label>
-              Location
-              <input
-                required
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                placeholder="Kathmandu / Lalitpur / Remote"
-              />
-            </label>
-
-            <label>
-              Employment Type
-              <select
-                value={form.jobType}
-                onChange={(e) => setForm({ ...form, jobType: e.target.value })}
-              >
-                <option value="full-time">Full-time</option>
-                <option value="part-time">Part-time</option>
-                <option value="contract">Contract</option>
-                <option value="internship">Internship</option>
-              </select>
-            </label>
-
-            <label>
-              Position Level
-              <select
-                value={form.position}
-                onChange={(e) => setForm({ ...form, position: e.target.value })}
-              >
-                <option>Entry Level</option>
-                <option>Mid Level</option>
-                <option>Senior Level</option>
-                <option>Top Level</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="form-grid-3">
-            <label>
-              Required Experience
-              <input
-                required
-                value={form.experience}
-                onChange={(e) => setForm({ ...form, experience: e.target.value })}
-                placeholder="2-4 years"
-              />
-            </label>
-
-            <label>
-              Offered Monthly Salary ($)
-              <input
-                required
-                type="number"
-                value={form.salary}
-                onChange={(e) => setForm({ ...form, salary: e.target.value })}
-              />
-            </label>
-
-            <label>
-              Application Deadline
-              <input
-                required
-                value={form.deadline}
-                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-                placeholder="e.g. 15 days remaining"
-              />
-            </label>
-          </div>
-
-          <label>
-            Required Skills (comma separated)
-            <input
-              required
-              placeholder="React, TypeScript, GraphQL, Docker"
-              value={form.skills}
-              onChange={(e) => setForm({ ...form, skills: e.target.value })}
-            />
-          </label>
-
-          <button className="primary-button" type="submit">
-            Publish Vacancy Now →
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => setShowForm(true)}
+          >
+            <Icon name="briefcase" size={16} />
+            <span>Post a New Vacancy</span>
           </button>
-        </form>
-      )}
+        </section>
 
-      {/* Active Jobs & Applicants Management */}
-      <section className="dashboard-section">
-        <div className="results-heading">
-          <h2>Your Published Vacancies</h2>
-          <span className="muted-text">{jobs.length} Active Postings</span>
+        {/* SaaS KPI Ribbon */}
+        <div className="kpi-ribbon-grid">
+          <div className="kpi-stat-card">
+            <div className="kpi-icon-box">
+              <Icon name="briefcase" size={22} />
+            </div>
+            <div>
+              <span className="kpi-stat-label">Active Vacancies</span>
+              <strong className="kpi-stat-number">{jobs.length}</strong>
+            </div>
+          </div>
+
+          <div className="kpi-stat-card">
+            <div className="kpi-icon-box">
+              <Icon name="user" size={22} />
+            </div>
+            <div>
+              <span className="kpi-stat-label">Total Applicants</span>
+              <strong className="kpi-stat-number">{totalApplicantsCount}</strong>
+            </div>
+          </div>
+
+          <div className="kpi-stat-card">
+            <div className="kpi-icon-box" style={{ background: "#fef3c7", color: "#b45309" }}>
+              <Icon name="clock" size={22} />
+            </div>
+            <div>
+              <span className="kpi-stat-label">Interviews</span>
+              <strong className="kpi-stat-number">{interviewCount}</strong>
+            </div>
+          </div>
+
+          <div className="kpi-stat-card">
+            <div className="kpi-icon-box" style={{ background: "#dcfce7", color: "#15803d" }}>
+              <Icon name="badgeCheck" size={22} />
+            </div>
+            <div>
+              <span className="kpi-stat-label">Offers Extended</span>
+              <strong className="kpi-stat-number">{hiredCount}</strong>
+            </div>
+          </div>
         </div>
 
-        {jobs.length === 0 ? (
-          <div className="empty-state">
-            <p>You have not published any job vacancies yet.</p>
-            <button
-              type="button"
-              className="primary-button compact"
-              onClick={() => setShowForm(true)}
-            >
-              Post Your First Job
-            </button>
-          </div>
-        ) : (
-          <div className="application-list">
-            {jobs.map((job) => {
-              const jobApps = applicants[job._id] || [];
-              return (
-                <div key={job._id} className="recruiter-job-card-block">
-                  <div className="application-row">
-                    <div className="company-mark">{(job.title || "J")[0]}</div>
-                    <div>
-                      <strong>{job.title}</strong>
-                      <p>
-                        {job.location} · {job.jobType} · {job.category || "General"}
-                      </p>
-                    </div>
-                    <span className="status green">
-                      {jobApps.length} Applicants
-                    </span>
-                    <Link href={`/jobs/${job._id}`} className="accent-link">
-                      Preview Vacancy
-                    </Link>
-                  </div>
+        {/* View Switcher Tabs */}
+        <div className="jobseeker-tab-bar">
+          <button
+            type="button"
+            className={`js-tab-btn ${activeTab === "jobs" ? "active" : ""}`}
+            onClick={() => setActiveTab("jobs")}
+          >
+            <Icon name="briefcase" size={16} />
+            <span>Published Vacancies ({jobs.length})</span>
+          </button>
+          <button
+            type="button"
+            className={`js-tab-btn ${activeTab === "applicants" ? "active" : ""}`}
+            onClick={() => setActiveTab("applicants")}
+          >
+            <Icon name="user" size={16} />
+            <span>Candidate Pipeline ({totalApplicantsCount})</span>
+          </button>
+        </div>
 
-                  {/* Applicants List */}
-                  {jobApps.length > 0 && (
-                    <div className="applicants-subtable">
-                      <span className="subtable-title">Received Applications:</span>
-                      {jobApps.map((app) => {
-                        const applicantObj =
-                          typeof app.applicant === "object" && app.applicant !== null
-                            ? app.applicant
-                            : { fullName: "Applicant", email: "N/A", phoneNumber: "N/A" };
-                        return (
-                          <div key={app._id} className="applicant-pipeline-row">
-                            <div className="app-person-info">
-                              <strong>{applicantObj.fullName}</strong>
-                              <span>{applicantObj.email}</span>
-                              {applicantObj.phoneNumber && (
-                                <span className="phone-tag">{applicantObj.phoneNumber}</span>
-                              )}
-                            </div>
-
-                            <div className="status-changer-box">
-                              <label>Status:</label>
-                              <select
-                                value={app.status}
-                                onChange={(e) =>
-                                  handleStatusChange(
-                                    app._id,
-                                    job._id,
-                                    e.target.value as Application["status"]
-                                  )
-                                }
-                                className={`status-dropdown ${app.status}`}
-                              >
-                                <option value="applied">Applied</option>
-                                <option value="interview">Interview</option>
-                                <option value="hired">Hired</option>
-                                <option value="rejected">Rejected</option>
-                              </select>
-                            </div>
+        {/* Published Vacancies View */}
+        {activeTab === "jobs" && (
+          <div>
+            {jobs.length === 0 ? (
+              <div className="empty-state">
+                <Icon name="briefcase" size={32} />
+                <strong>No vacancies published yet</strong>
+                <p>Post your first job vacancy to start receiving verified applications from Nepali talent.</p>
+                <button
+                  type="button"
+                  className="primary-button compact"
+                  onClick={() => setShowForm(true)}
+                >
+                  Create Vacancy Post
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {jobs.map((job) => {
+                  const jobApps = applicants[job._id] || [];
+                  return (
+                    <div
+                      key={job._id}
+                      style={{
+                        background: "var(--white)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "var(--radius-lg)",
+                        padding: "24px",
+                        boxShadow: "var(--shadow-xs)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                          <div className="company-mark">{(job.title || "J").slice(0, 1)}</div>
+                          <div>
+                            <h3 style={{ fontSize: "17px", fontWeight: 800, margin: "0 0 4px", color: "var(--ink)" }}>
+                              {job.title}
+                            </h3>
+                            <p style={{ fontSize: "13px", color: "var(--muted)", margin: 0 }}>
+                              {job.location} • <span className="capitalize">{job.jobType}</span> • {job.category || "Information Technology"}
+                            </p>
                           </div>
-                        );
-                      })}
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span className="filter-chip" style={{ background: "var(--mint)", color: "var(--green)" }}>
+                            {jobApps.length} Applicants
+                          </span>
+                          <Link href={`/jobs/${job._id}`} className="card-view-btn">
+                            Preview Vacancy <Icon name="external" size={13} />
+                          </Link>
+                        </div>
+                      </div>
+
+                      {jobApps.length > 0 && (
+                        <div style={{ marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--line-subtle)" }}>
+                          <h4 style={{ fontSize: "13.5px", fontWeight: 700, margin: "0 0 12px", color: "var(--ink)" }}>
+                            Recent Applicants ({jobApps.length}):
+                          </h4>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                            {jobApps.map((app) => {
+                              const applicantObj =
+                                typeof app.applicant === "object" && app.applicant !== null
+                                  ? app.applicant
+                                  : { fullName: "Candidate", email: "N/A", phoneNumber: "N/A" };
+                              return (
+                                <div key={app._id} className="applicant-card">
+                                  <div className="applicant-info-block">
+                                    <div className="applicant-avatar">
+                                      {(applicantObj.fullName || "C").slice(0, 1)}
+                                    </div>
+                                    <div>
+                                      <h4 className="applicant-name">{applicantObj.fullName}</h4>
+                                      <div className="applicant-subline">
+                                        <span>{applicantObj.email}</span>
+                                        {applicantObj.phoneNumber && (
+                                          <span>• {applicantObj.phoneNumber}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                    <label style={{ fontSize: "12.5px", fontWeight: 700, color: "var(--muted)" }}>Status:</label>
+                                    <select
+                                      value={app.status}
+                                      onChange={(e) =>
+                                        handleStatusChange(
+                                          app._id,
+                                          job._id,
+                                          e.target.value as Application["status"]
+                                        )
+                                      }
+                                      className="sort-select"
+                                    >
+                                      <option value="applied">Applied</option>
+                                      <option value="interview">Interview</option>
+                                      <option value="hired">Hired</option>
+                                      <option value="rejected">Rejected</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
-      </section>
+
+        {/* Candidate Pipeline View */}
+        {activeTab === "applicants" && (
+          <div>
+            {totalApplicantsCount === 0 ? (
+              <div className="empty-state">
+                <Icon name="user" size={32} />
+                <strong>No applicants in pipeline yet</strong>
+                <p>When candidates apply to your published roles, they will appear here with full profile details.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {Object.entries(applicants).flatMap(([jobId, apps]) =>
+                  apps.map((app) => {
+                    const matchedJob = jobs.find((j) => j._id === jobId);
+                    const applicantObj =
+                      typeof app.applicant === "object" && app.applicant !== null
+                        ? app.applicant
+                        : { fullName: "Applicant", email: "N/A", phoneNumber: "N/A" };
+                    return (
+                      <div key={app._id} className="applicant-card">
+                        <div className="applicant-info-block">
+                          <div className="applicant-avatar">
+                            {(applicantObj.fullName || "A").slice(0, 1)}
+                          </div>
+                          <div>
+                            <h4 className="applicant-name">{applicantObj.fullName}</h4>
+                            <div className="applicant-subline">
+                              <span>Applied for: <strong>{matchedJob?.title || "Vacancy"}</strong></span>
+                              <span>• {applicantObj.email}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span className={`status-badge ${app.status}`}>{app.status}</span>
+                          <select
+                            value={app.status}
+                            onChange={(e) =>
+                              handleStatusChange(app._id, jobId, e.target.value as Application["status"])
+                            }
+                            className="sort-select"
+                          >
+                            <option value="applied">Applied</option>
+                            <option value="interview">Interview</option>
+                            <option value="hired">Hired</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Modal Dialog for Posting a Vacancy */}
+        {showForm && (
+          <div className="modal-overlay" onClick={() => setShowForm(false)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header-row">
+                <div>
+                  <span className="eyebrow-accent">NEW POSTING</span>
+                  <h2>Publish a Job Vacancy</h2>
+                </div>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => setShowForm(false)}
+                >
+                  <Icon name="close" size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={submitJob} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div className="job-form-grid">
+                  <div className="form-field-group">
+                    <label>Job Title</label>
+                    <input
+                      required
+                      value={form.title}
+                      onChange={(e) => setForm({ ...form, title: e.target.value })}
+                      placeholder="e.g. Senior Backend Engineer"
+                    />
+                  </div>
+
+                  <div className="form-field-group">
+                    <label>Category</label>
+                    <select
+                      value={form.category}
+                      onChange={(e) => setForm({ ...form, category: e.target.value })}
+                    >
+                      <option>Information Technology</option>
+                      <option>Banking &amp; Financial Services</option>
+                      <option>Healthcare &amp; Pharmaceuticals</option>
+                      <option>Advertising, Design &amp; Media</option>
+                      <option>Education &amp; Non-Profit</option>
+                      <option>Sales &amp; Business Development</option>
+                      <option>Telecommunications &amp; ISP</option>
+                    </select>
+                  </div>
+
+                  <div className="form-field-group full-span">
+                    <label>Job Description</label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      placeholder="Describe the mission, day-to-day work, and impact..."
+                    />
+                  </div>
+
+                  <div className="form-field-group full-span">
+                    <label>Key Requirements (comma separated)</label>
+                    <input
+                      required
+                      value={form.requirements}
+                      onChange={(e) => setForm({ ...form, requirements: e.target.value })}
+                      placeholder="3+ years React, Bachelor in CS, Strong system architecture"
+                    />
+                  </div>
+
+                  <div className="form-field-group">
+                    <label>Location</label>
+                    <input
+                      required
+                      value={form.location}
+                      onChange={(e) => setForm({ ...form, location: e.target.value })}
+                      placeholder="Kathmandu / Lalitpur / Remote"
+                    />
+                  </div>
+
+                  <div className="form-field-group">
+                    <label>Employment Type</label>
+                    <select
+                      value={form.jobType}
+                      onChange={(e) => setForm({ ...form, jobType: e.target.value })}
+                    >
+                      <option value="full-time">Full-time</option>
+                      <option value="part-time">Part-time</option>
+                      <option value="contract">Contract</option>
+                      <option value="internship">Internship</option>
+                    </select>
+                  </div>
+
+                  <div className="form-field-group">
+                    <label>Offered Monthly Salary (Rs.)</label>
+                    <input
+                      required
+                      type="number"
+                      value={form.salary}
+                      onChange={(e) => setForm({ ...form, salary: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-field-group">
+                    <label>Application Deadline</label>
+                    <input
+                      required
+                      value={form.deadline}
+                      onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                      placeholder="e.g. 25 days remaining"
+                    />
+                  </div>
+
+                  <div className="form-field-group full-span">
+                    <label>Required Skills (comma separated)</label>
+                    <input
+                      required
+                      value={form.skills}
+                      onChange={(e) => setForm({ ...form, skills: e.target.value })}
+                      placeholder="Node.js, MongoDB, TypeScript, REST API"
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px" }}>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setShowForm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary-button">
+                    Publish Vacancy Now
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {(message || statusMessage) && (
+          <button
+            className="toast"
+            onClick={() => {
+              setMessage("");
+              setStatusMessage("");
+            }}
+          >
+            {message || statusMessage} <Icon name="close" size={14} />
+          </button>
+        )}
+      </div>
     </PageShell>
   );
 }

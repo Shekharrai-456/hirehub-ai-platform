@@ -1,4 +1,13 @@
-import type { Application, Company, Job, User } from "@/src/types";
+import type {
+  Application,
+  Company,
+  Education,
+  Experience,
+  Job,
+  JobAlert,
+  PreferredJob,
+  User,
+} from "@/src/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
@@ -111,13 +120,60 @@ export function updateApplicationStatus(
 }
 
 export function updateUserProfile(data: {
-  fullName: string;
-  email: string;
-  phoneNumber: string;
-  bio: string;
-  skills: string;
+  fullName?: string;
+  email?: string;
+  phoneNumber?: string;
+  bio?: string;
+  skills?: string | string[];
+  preferredJob?: PreferredJob;
+  education?: Education[];
+  experience?: Experience[];
+  activelySeeking?: boolean;
+  resume?: string;
+  resumeOriginalName?: string;
 }) {
   return post<{ user: User }>("/user/profile/update", data);
+}
+
+export function getUserProfile() {
+  return get<{ user: User }>("/user/profile");
+}
+
+export function toggleActivelySeeking(active: boolean) {
+  return post<{
+    user: User;
+    activelySeeking: boolean;
+    expiresAt: string | null;
+  }>("/user/profile/toggle-seeking", { active });
+}
+
+export function toggleSaveJob(jobId: string) {
+  return post<{
+    saved: boolean;
+    savedJobs: string[];
+    user: User;
+  }>(`/user/profile/save-job/${jobId}`);
+}
+
+export function updateUserPreferences(preferredJob: PreferredJob) {
+  return post<{
+    preferredJob: PreferredJob;
+    user: User;
+  }>("/user/profile/preferences", { preferredJob });
+}
+
+export function addJobAlert(alert: { category: string; keyword: string; frequency: string }) {
+  return post<{
+    jobAlerts: JobAlert[];
+    user: User;
+  }>("/user/profile/job-alerts", alert);
+}
+
+export function deleteJobAlert(alertId: string) {
+  return request<{
+    jobAlerts: JobAlert[];
+    user: User;
+  }>(`/user/profile/job-alerts/${alertId}`, { method: "DELETE" });
 }
 
 export function createJob(data: {

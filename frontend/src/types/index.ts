@@ -13,9 +13,17 @@ export type Company = {
   description?: string;
 };
 
+export type ApplicationStatus =
+  | "applied"
+  | "viewed"
+  | "shortlisted"
+  | "interview"
+  | "hired"
+  | "rejected";
+
 export type Application = {
   _id: string;
-  status: "applied" | "interview" | "hired" | "rejected";
+  status: ApplicationStatus;
   applicant: User | string;
   job: Job | string;
   createdAt?: string;
@@ -39,14 +47,55 @@ export type Job = {
   createdAt?: string;
 };
 
+export type PreferredJob = {
+  category?: string;
+  location?: string;
+  expectedSalary?: string;
+  jobLevel?: string;
+  jobType?: string;
+};
+
+export type Education = {
+  degree: string;
+  institution: string;
+  graduationYear: string;
+};
+
+export type Experience = {
+  title: string;
+  company: string;
+  duration: string;
+};
+
+export type JobAlert = {
+  _id?: string;
+  category: string;
+  keyword: string;
+  frequency: string;
+  createdAt?: string;
+};
+
+export type UserProfile = {
+  bio?: string;
+  skills?: string[];
+  resume?: string;
+  resumeOriginalName?: string;
+  profilePicture?: string;
+  activelySeeking?: boolean;
+  activelySeekingExpiresAt?: string;
+  preferredJob?: PreferredJob;
+  savedJobs?: string[];
+  jobAlerts?: JobAlert[];
+  education?: Education[];
+  experience?: Experience[];
+  profileViews?: number;
+};
+
 export type User = {
   _id: string;
   fullName: string;
   email: string;
   phoneNumber?: string | number;
   role: Role;
-  profile?: {
-    bio?: string;
-    skills?: string[];
-  };
+  profile?: UserProfile;
 };

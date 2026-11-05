@@ -2,7 +2,7 @@ import { Application } from "../src/models/application.model.js";
 import { Job } from "../src/models/job.model.js";
 import { failure, handleError, success } from "../src/utils/http.js";
 
-const validStatuses = ["applied", "interview", "hired", "rejected"];
+const validStatuses = ["applied", "viewed", "shortlisted", "interview", "hired", "rejected"];
 
 export async function applyJob(req, res) {
     try {
